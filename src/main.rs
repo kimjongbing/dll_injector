@@ -181,8 +181,8 @@ fn main() {
         inject_dll(pid, &args[2]);
     } else {
         println!("Usage:");
-        println!("1. List all processes: cargo run list");
-        println!("2. Get PID of a process by name: cargo run pid <process name>");
-        println!("3. Inject DLL into a process: cargo run <PID> <DLL path>");
+        println!("1. List all processes: dll_injector.exe <list>");
+        println!("2. Get PID of a process by name: dll_injector.exe pid <process name>");
+        println!("3. Inject DLL into a process: dll_injector.exe <PID> <DLL path>");
     }
 }

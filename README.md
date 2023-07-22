@@ -32,7 +32,7 @@ This tool can be used to list all process IDs (PIDs), retrieve the PID of a runn
     dll_injector.exe 1234 C:/path/to/your/payload.dll
     ```
 
-This is a command-line application, so all inputs (arguments) should be passed in the command line. Please also run as administrator if you have any issues.
+This is a command-line application, so all inputs (arguments) should be passed in the command line. Run the command-line as administrator if you have any issues.
 
 
 ## Compile Guide

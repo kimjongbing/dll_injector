@@ -7,53 +7,48 @@ use winapi::um::tlhelp32::{
     CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
 };
 
-
-fn process_snapshot() -> Option<*mut winapi::ctypes::c_void> {
-    unsafe {
-        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if snapshot == winapi::um::handleapi::INVALID_HANDLE_VALUE {
-            eprintln!("Failed to create snapshot of current processes.");
-            None
-        } else {
-            Some(snapshot)
-        }
+fn process_snapshot() -> Result<*mut winapi::ctypes::c_void, &'static str> {
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == winapi::um::handleapi::INVALID_HANDLE_VALUE {
+        Err("Failed to create snapshot of current processes.")
+    } else {
+        Ok(snapshot)
     }
 }
 
-fn first_process_entry(snapshot: *mut winapi::ctypes::c_void) -> Option<PROCESSENTRY32> {
+fn first_process_entry(
+    snapshot: *mut winapi::ctypes::c_void,
+) -> Result<PROCESSENTRY32, &'static str> {
     let mut pe32: PROCESSENTRY32 = unsafe { std::mem::zeroed() };
     pe32.dwSize = std::mem::size_of::<PROCESSENTRY32>() as DWORD;
     let success = unsafe { Process32First(snapshot, &mut pe32) };
 
     if success == FALSE {
-        eprintln!("Failed to gather information about the first process.");
         unsafe { CloseHandle(snapshot) };
-        None
+        Err("Failed to gather information about the first process.")
     } else {
-        Some(pe32)
+        Ok(pe32)
     }
 }
 
-fn iterate_processes<F: FnMut(PROCESSENTRY32) -> bool>(mut callback: F) {
-    if let Some(snapshot) = process_snapshot() {
-        if let Some(mut pe32) = first_process_entry(snapshot) {
-            loop {
-                if !callback(pe32) {
-                    break;
-                }
+fn iterate_processes<F: FnMut(PROCESSENTRY32) -> bool>(
+    mut callback: F,
+) -> Result<(), &'static str> {
+    let snapshot = process_snapshot()?;
+    let mut pe32 = first_process_entry(snapshot)?;
 
-                if unsafe { Process32Next(snapshot, &mut pe32) } == FALSE {
-                    break;
-                }
-            }
-
-            unsafe { CloseHandle(snapshot) };
+    loop {
+        if !callback(pe32) || unsafe { Process32Next(snapshot, &mut pe32) } == FALSE {
+            break;
         }
     }
+
+    unsafe { CloseHandle(snapshot) };
+    Ok(())
 }
 
 pub fn enumerate_processes() {
-    iterate_processes(|pe32| {
+    let _ = iterate_processes(|pe32| {
         let process_name = unsafe {
             CStr::from_ptr(pe32.szExeFile.as_ptr())
                 .to_string_lossy()
@@ -67,28 +62,28 @@ pub fn enumerate_processes() {
     });
 }
 
-
 pub fn find_process_id_by_name(name: &str) -> Option<DWORD> {
     let name = name.to_lowercase();
     let mut pid = None;
 
-    iterate_processes(|pe32| {
+    let _ = iterate_processes(|pe32| {
         let process_name = unsafe {
             CStr::from_ptr(pe32.szExeFile.as_ptr())
                 .to_string_lossy()
                 .into_owned()
         };
 
-        if process_name.to_lowercase() == name {
+        let is_target_process_found = process_name.to_lowercase() == name;
+
+        if is_target_process_found {
             println!(
                 "Found process: {}, Process ID: {}",
                 process_name, pe32.th32ProcessID
             );
             pid = Some(pe32.th32ProcessID);
-            false // stop iterating
-        } else {
-            true // continue iterating
         }
+
+        !is_target_process_found
     });
 
     if pid.is_none() {

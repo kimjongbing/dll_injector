@@ -3,8 +3,8 @@ extern crate winapi;
 use std::env;
 use winapi::shared::minwindef::DWORD;
 
-mod processes;
 mod injection;
+mod processes;
 
 fn print_usage() {
     println!("Usage:");
@@ -27,7 +27,10 @@ fn main() {
         }
         3 if args[1].parse::<DWORD>().is_ok() => {
             let pid = args[1].parse::<DWORD>().unwrap();
-            injection::inject_dll(pid, &args[2]);
+            match injection::inject_dll(pid, &args[2]) {
+                Ok(_) => println!("Successfully injected DLL into process: {}", pid),
+                Err(e) => eprintln!("Failed to inject DLL into process: {}. Error: {}", pid, e),
+            }
         }
         _ => print_usage(),
     }
